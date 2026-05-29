@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+import sys
+import os
+from pathlib import Path
+
+# Add src to sys.path, resolving symlinks
+sys.path.append(str(Path(__file__).resolve().parent.parent / "src"))
+
+from core import engine
+
+def usage():
+    print("Usage: appbridge [command] [args]")
+    print("Commands:")
+    print("  run <app_id>       Run an installed app")
+    print("  install <path>     Install a new Windows app from .exe/.msi")
+    print("  list               List installed apps")
+    print("  manager            Open the AppBridge Manager")
+    print("  uninstall <app_id> Uninstall an app")
+    print("  update             Check for updates")
+
+def main():
+    if len(sys.argv) < 2:
+        usage()
+        return
+
+    cmd = sys.argv[1]
+
+    if cmd == "run":
+        if len(sys.argv) < 3:
+            print("Error: app_id required")
+            return
+        app_id = sys.argv[2]
+        config = engine.get_config()
+        if app_id in config['apps']:
+            app = config['apps'][app_id]
+            engine.run_in_wine(app['exe_path'], app_id)
+        else:
+            print(f"App {app_id} not found")
+
+    elif cmd == "install":
+        if len(sys.argv) < 3:
+            print("Error: installer path required")
+            return
+        installer_path = sys.argv[2]
+        name = os.path.basename(installer_path).replace(".exe", "").replace(".msi", "")
+        engine.install_exe(installer_path, name)
+
+    elif cmd == "list":
+        config = engine.get_config()
+        for app_id, app in config['apps'].items():
+            print(f"{app_id}: {app['name']}")
+
+    elif cmd == "uninstall":
+        if len(sys.argv) < 3:
+            print("Error: app_id required")
+            return
+        app_id = sys.argv[2]
+        engine.uninstall_app(app_id)
+
+    elif cmd == "manager":
+        from manager import manager_gui
+        manager_gui.main()
+    elif cmd == "update":
+        from core import updater
+        updater.main()
+    else:
+        usage()
+
+if __name__ == "__main__":
+    main()
