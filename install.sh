@@ -1,18 +1,13 @@
 #!/bin/bash
 
-# AppBridge Standalone Installer for Arch Linux
-# This script downloads the latest version from GitHub and installs it.
+# AppBridge Standalone Installer
+# Repository: https://github.com/ZimnyySTD/AppBridge/
 
-REPO="yourusername/AppBridge"
+REPO="ZimnyySTD/AppBridge"
 INSTALL_DIR="/opt/appbridge"
 BIN_DIR="/usr/local/bin"
 
 echo "--- AppBridge Installer ---"
-
-# Check for Arch Linux
-if [ ! -f /etc/arch-release ]; then
-    echo "Warning: Arch Linux not detected. Proceed with caution."
-fi
 
 # Install system dependencies
 echo "Installing dependencies..."
@@ -38,29 +33,34 @@ if [ -z "$LATEST_TAG" ] || [ "$1" == "--local" ]; then
         exit 1
     fi
 else
-    echo "Latest version is $LATEST_TAG. Downloading..."
-
-    # Download the source tarball from the release
+    echo "Latest version is $LATEST_TAG. Downloading from GitHub..."
     DOWNLOAD_URL="https://github.com/$REPO/archive/refs/tags/$LATEST_TAG.tar.gz"
     TEMP_DIR=$(mktemp -d)
 
-    curl -L "$DOWNLOAD_URL" -o "$TEMP_DIR/appbridge.tar.gz"
+    if curl -L "$DOWNLOAD_URL" -o "$TEMP_DIR/appbridge.tar.gz"; then
+        echo "Extracting..."
+        tar -xzf "$TEMP_DIR/appbridge.tar.gz" -C "$TEMP_DIR"
+        # The folder name inside tarball usually includes the repo name and tag/branch
+        SRC_FOLDER=$(find "$TEMP_DIR" -maxdepth 1 -type d -name "AppBridge-*" | head -n 1)
 
-    echo "Extracting..."
-    tar -xzf "$TEMP_DIR/appbridge.tar.gz" -C "$TEMP_DIR"
-    SRC_FOLDER=$(ls -d $TEMP_DIR/AppBridge-*)
-
-    # Installation
-    echo "Installing to $INSTALL_DIR..."
-    sudo mkdir -p $INSTALL_DIR
-    sudo cp -r "$SRC_FOLDER"/* $INSTALL_DIR/
-
-    # Clean up
+        if [ -d "$SRC_FOLDER" ]; then
+            echo "Installing to $INSTALL_DIR..."
+            sudo mkdir -p $INSTALL_DIR
+            sudo cp -r "$SRC_FOLDER"/* $INSTALL_DIR/
+        else
+            echo "Error: Could not find source folder after extraction."
+            exit 1
+        fi
+    else
+        echo "Error: Download failed."
+        exit 1
+    fi
     rm -rf "$TEMP_DIR"
 fi
 
 # Set permissions
 sudo chmod +x "$INSTALL_DIR/bin/appbridge"
+sudo chmod +x "$INSTALL_DIR/uninstall_appbridge.sh"
 
 # Create symlink
 sudo ln -sf "$INSTALL_DIR/bin/appbridge" "$BIN_DIR/appbridge"
@@ -80,8 +80,5 @@ Categories=System;Utility;
 EOF"
 
 echo "------------------------------------------------"
-echo "AppBridge $LATEST_TAG has been installed successfully!"
+echo "AppBridge has been installed successfully!"
 echo "Run 'appbridge manager' to get started."
-
-# Clean up
-rm -rf "$TEMP_DIR"

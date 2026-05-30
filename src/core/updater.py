@@ -5,34 +5,48 @@ import subprocess
 import shutil
 from pathlib import Path
 
-VERSION = "0.1.0"
-REPO = "yourusername/AppBridge"
+VERSION = "1.0.0"
+REPO = "ZimnyySTD/AppBridge"
+
+def parse_version(v_str):
+    # Handles v1.0.0 or 1.0.0
+    return [int(x) for x in v_str.lstrip('vV').split('.')]
+
+def format_version(v_list):
+    return ".".join(map(str, v_list))
 
 def check_for_updates():
     try:
         response = requests.get(f"https://api.github.com/repos/{REPO}/releases/latest")
         if response.status_code == 200:
-            latest_version = response.json()["tag_name"]
-            # Assuming tag is like 'v0.1.1' or just '0.1.1'
-            clean_latest = latest_version.lstrip('v')
-            if clean_latest != VERSION:
-                return latest_version
+            latest_tag = response.json()["tag_name"]
+
+            curr_v = parse_version(VERSION)
+            late_v = parse_version(latest_tag)
+
+            if late_v > curr_v:
+                return latest_tag
     except Exception as e:
         print(f"Update check failed: {e}")
     return None
 
 def apply_update(tag):
     print(f"Updating to {tag}...")
-    # We'll use curl and bash to run the installer script from the new version
-    # This is the cleanest way to update system-wide files
-    install_script_url = f"https://raw.githubusercontent/{REPO}/{tag}/install.sh"
+    # The URL for raw files from a specific tag
+    install_script_url = f"https://raw.githubusercontent.com/{REPO}/{tag}/install.sh"
 
     try:
-        # Download and run the install script
-        # Note: In a production app, you'd want more verification here
-        cmd = f"curl -fsSL {install_script_url} | bash"
-        subprocess.run(cmd, shell=True, check=True)
-        print("Update applied successfully.")
+        # Download the install script and run it
+        print(f"Downloading installer from {install_script_url}")
+        response = requests.get(install_script_url)
+        if response.status_code == 200:
+            with open("/tmp/appbridge_install.sh", "w") as f:
+                f.write(response.text)
+
+            subprocess.run(["bash", "/tmp/appbridge_install.sh"], check=True)
+            print("Update applied successfully.")
+        else:
+            print(f"Failed to download installer: HTTP {response.status_code}")
     except subprocess.CalledProcessError as e:
         print(f"Failed to apply update: {e}")
 
