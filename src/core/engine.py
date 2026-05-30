@@ -27,7 +27,24 @@ def save_config(config):
 
 def get_wine_prefix(app_id):
     prefix = APPS_DIR / app_id / "prefix"
+    is_new = not prefix.exists()
     prefix.mkdir(parents=True, exist_ok=True)
+    if is_new:
+        # Initial prefix setup
+        print(f"Initializing new prefix for {app_id}...")
+        env = os.environ.copy()
+        env['WINEPREFIX'] = str(prefix)
+        env['WINEDEBUG'] = '-all'
+        # Set Windows 10 version
+        subprocess.run(['winecfg', '/v', 'win10'], env=env, capture_output=True)
+        # Disable wine's desktop integration to prevent desktop clutter
+        # We delete the 'Desktop' folder in the prefix to stop wine from creating shortcuts there
+        desktop_path = prefix / "drive_c" / "users" / os.getlogin() / "Desktop"
+        if desktop_path.exists():
+            shutil.rmtree(desktop_path)
+        # Create a file to prevent wine from recreating it easily (or just symlink it to /dev/null)
+        os.symlink('/dev/null', str(desktop_path))
+
     return prefix
 
 def run_in_wine(exe_path, app_id=None, env=None):
@@ -98,9 +115,25 @@ def uninstall_app(app_id):
         if desktop_file.exists():
             desktop_file.unlink()
 
+        # Also look for any other desktop files wine might have created in the system
+        # though our desktop-to-null trick should prevent this, it's good practice.
+        wine_desktop_dir = Path.home() / ".local/share/applications/wine/Programs"
+        if wine_desktop_dir.exists():
+            # This is complex to target precisely, so we rely on our prefix isolation.
+            pass
+
+        # Remove icons
+        icon_path = config['apps'][app_id].get('icon_path')
+        if icon_path and Path(icon_path).exists() and str(APPBRIDGE_DATA_DIR) in icon_path:
+            Path(icon_path).unlink()
+
         # Remove data/prefix
         app_dir = APPS_DIR / app_id
         if app_dir.exists():
+            # If it's a symlink (like our Desktop trick), unlink it first
+            for item in app_dir.rglob('*'):
+                if item.is_symlink():
+                    item.unlink()
             shutil.rmtree(app_dir)
 
         del config['apps'][app_id]

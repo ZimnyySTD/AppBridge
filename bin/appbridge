@@ -17,6 +17,7 @@ def usage():
     print("  manager            Open the AppBridge Manager")
     print("  uninstall <app_id> Uninstall an app")
     print("  update             Check for updates")
+    print("  self-uninstall     Uninstall AppBridge itself")
 
 def main():
     if len(sys.argv) < 2:
@@ -63,6 +64,9 @@ def main():
     elif cmd == "update":
         from core import updater
         updater.main()
+    elif cmd == "self-uninstall":
+        script_path = Path(__file__).resolve().parent.parent / "uninstall_appbridge.sh"
+        os.execv('/bin/bash', ['bash', str(script_path)])
     else:
         usage()
 
